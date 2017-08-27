@@ -15,14 +15,14 @@ const formatsProxy = require('http-rdf-formats-proxy')
 
 const app = express()
 app.get('/proxy', formatsProxy({
-	// options with their default values:
-	fetch: require('rdf-fetch-lite')
-      // Fetch used for the proxy request
-      // Must implement response.quadStream() returning
-      //   data following RDFJS spec interfaces
-    formats: require('rdf-formats-common')()
-      // These formats are used for serialization
-      // Formats could be taken also from provided fetch
+  // options with their default values:
+  fetch: require('rdf-fetch-lite')
+  // Fetch used for the proxy request
+  // Must implement response.quadStream() returning
+  //   data following RDFJS spec interfaces
+  formats: require('rdf-formats-common')()
+  // These formats are used for serialization
+  // Formats could be taken also from provided fetch
 }))
 app.server = app.listen(8000)
 ```
