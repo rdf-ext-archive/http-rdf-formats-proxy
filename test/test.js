@@ -23,14 +23,14 @@ function proxyRequest (uri, accept) {
   return rdfFetch(proxyUrl + '?uri=' + uri, { headers: { 'Accept': accept } })
 }
 
-describe('rdf-formats-proxy', () => {
+describe('http-rdf-formats-proxy', () => {
   before(() => {
     app.server = app.listen(proxyPort)
   })
   after(() => {
     app.server.close()
   })
-  it('no uri specified', (done) => {
+  it('no uri specified -> 400 Bad Request', (done) => {
     rdfFetch(proxyUrl, { headers: { 'Accept': 'text/n3' } }).then((res) => {
       expect(res.status).to.be.equal(400)
       return streamToString(res.body)
@@ -40,7 +40,7 @@ describe('rdf-formats-proxy', () => {
       done()
     }).catch(done)
   })
-  it('convert json+ld to n3 through a proxy', (done) => {
+  it('convert json+ld to n3', (done) => {
     proxyRequest('http://xmlns.com/foaf/spec/index.jsonld', 'text/n3').then((res) => {
       expect(res.status).to.be.equal(200)
       return res.dataset()
@@ -49,7 +49,7 @@ describe('rdf-formats-proxy', () => {
       done()
     }).catch(done)
   })
-  it('convert to unsupported/type should pass data through?', (done) => {
+  it('convert to unsupported/type should pass data through(?)', (done) => {
     proxyRequest('http://xmlns.com/foaf/spec/index.jsonld', 'unsupported/type').then((res) => {
       expect(res.status).to.be.equal(200)
       expect(res.headers.get('content-type')).to.be.equal('application/ld+json; charset=utf-8')
@@ -59,7 +59,7 @@ describe('rdf-formats-proxy', () => {
       done()
     }).catch(done)
   })
-  it('pass non-rdf page data through?', (done) => {
+  it('pass non-rdf page data through(?)', (done) => {
     proxyRequest('http://xmlns.com/foaf/foafsig', 'text/n3').then((res) => {
       expect(res.status).to.be.equal(200)
       expect(res.headers.get('content-type')).to.be.equal('text/html; charset=utf-8')
@@ -76,7 +76,7 @@ describe('rdf-formats-proxy', () => {
       done()
     }).catch(done)
   })
-  it('fetching from a not existing server should yield 502?', (done) => {
+  it('fetching from a not existing server should yield 502(?)', (done) => {
     proxyRequest('http://example.com/resource.ttl', 'text/n3').then((res) => {
       expect(res.status).to.be.equal(502)
       expect(res.headers.get('content-type')).to.be.equal('application/json; charset=utf-8')

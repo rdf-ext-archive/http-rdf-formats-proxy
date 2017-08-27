@@ -1,7 +1,7 @@
 {
   "name": "http-rdf-formats-proxy",
   "version": "0.0.1",
-  "description": "Express middleware for fetching and converting between RDF formats",
+  "description": "Express middleware for fetching and converting resources between RDF formats",
   "main": "index.js",
   "scripts": {
     "test": "standard && mocha"

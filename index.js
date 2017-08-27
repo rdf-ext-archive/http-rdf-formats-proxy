@@ -82,7 +82,7 @@ class RdfFormatsProxy {
     }
     debug('Content-type: ' + this.contentType)
 
-    // if the response status if ok
+    // if the response status is ok
     if (res.status >= 200 && res.status < 300) {
       // what we do with that content-type?
       if (this.accept.indexOf(this.contentType) === -1) {
