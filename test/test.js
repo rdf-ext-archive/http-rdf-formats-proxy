@@ -6,7 +6,11 @@ const expect = require('chai').expect
 const express = require('express')
 const streamToString = require('stream-to-string')
 const rdfFetch = require('rdf-fetch')
+const formats = require('rdf-formats-common')()
+
 const formatsProxy = require('..')
+const OldApiParserWrapper = formatsProxy.OldApiParserWrapper
+formats.parsers['application/rdf+xml'] = new OldApiParserWrapper({ parser: require('rdf-parser-rdfxml') })
 
 const proxyUrlHost = 'http://localhost'
 const proxyPort = 8000
@@ -17,7 +21,7 @@ nockInit(proxyUrlHost, proxyPort)
 const proxyUrl = proxyUrlHost + ':' + proxyPort + '/proxy'
 
 const app = express()
-app.get('/proxy', formatsProxy())
+app.get('/proxy', formatsProxy({ formats: formats }))
 
 function proxyRequest (uri, accept) {
   return rdfFetch(proxyUrl + '?uri=' + uri, { headers: { 'Accept': accept } })
@@ -46,6 +50,15 @@ describe('http-rdf-formats-proxy', () => {
       return res.dataset()
     }).then((data) => {
       expect(data.length).to.be.equal(620)
+      done()
+    }).catch(done)
+  })
+  it('convert rdf+xml to n3', (done) => {
+    proxyRequest('http://xmlns.com/foaf/spec/index.rdf', 'text/n3').then((res) => {
+      expect(res.status).to.be.equal(200)
+      return res.dataset()
+    }).then((data) => {
+      expect(data.length).to.be.equal(632)
       done()
     }).catch(done)
   })
@@ -82,13 +95,7 @@ describe('http-rdf-formats-proxy', () => {
       expect(res.headers.get('content-type')).to.be.equal('application/json; charset=utf-8')
       return res.json()
     }).then((data) => {
-      expect(data).to.deep.equal({
-        'name': 'FetchError',
-        'message': 'request to http://example.com/resource.ttl failed, reason: connect ECONNREFUSED 127.0.0.1:80',
-        'type': 'system',
-        'errno': 'ECONNREFUSED',
-        'code': 'ECONNREFUSED'
-      })
+      expect(data.name).to.equal('FetchError')
       done()
     }).catch(done)
   })

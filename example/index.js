@@ -5,8 +5,8 @@ const formatsProxy = require('..') // require('http-rdf-formats-proxy')
 
 const app = express()
 app.get('/proxy', formatsProxy({
-	fetch: require('rdf-fetch-lite'),
-    formats: require('rdf-formats-common')()
+  fetch: require('rdf-fetch-lite'),
+  formats: require('rdf-formats-common')()
 }))
 app.server = app.listen(8000)
 

@@ -149,3 +149,4 @@ module.exports = function (options) {
     (new RdfFormatsProxy(req, res, next, options)).proxy()
   }
 }
+module.exports.OldApiParserWrapper = require('./lib/rdf-parser-oldapi-wrapper')

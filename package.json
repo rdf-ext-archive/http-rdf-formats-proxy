@@ -22,6 +22,7 @@
     "mocha": "^3.2.0",
     "nock": "^9.0.14",
     "rdf-fetch": "^1.0.0",
+    "rdf-parser-rdfxml": "^0.3.1",
     "standard": "^10.0.2"
   },
   "dependencies": {
