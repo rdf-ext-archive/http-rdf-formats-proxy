@@ -47,7 +47,6 @@ class RdfFormatsProxy {
     }
   }
 
-
   _processRequest () {
     debugCall('_processRequest()')
     // uri query parameter required
@@ -161,11 +160,11 @@ class RdfFormatsProxy {
   }
 
   // util methods
-  _uniq(array) {
+  _uniq (array) {
     return [...new Set(array)]
   }
-  _intersect(a, b) {
-    let t; if (b.length > a.length) t = b, b = a, a = t
+  _intersect (a, b) {
+    let t; if (b.length > a.length) { t = b; b = a; a = t }
     return a.filter((e) => { return b.indexOf(e) > -1 })
   }
 }

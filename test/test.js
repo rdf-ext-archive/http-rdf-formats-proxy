@@ -21,7 +21,7 @@ const nockRecord = false
 
 const proxyUrlHost = 'http://localhost'
 const proxyPort = 8000
-const proxyServer = proxyUrlHost+':'+proxyPort
+const proxyServer = proxyUrlHost + ':' + proxyPort
 const proxyUrl = proxyServer + '/proxy'
 
 const app = express()
