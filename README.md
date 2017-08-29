@@ -41,6 +41,7 @@ curl -H 'Accept: application/n-triples' 'http://localhost:8000/proxy?uri=http://
 ```mocha
     ✓ no uri specified -> 400 Bad Request
     ✓ convert json+ld to n3
+    ✓ convert rdf+xml to n3
     ✓ convert to unsupported/type should pass data through(?)
     ✓ pass non-rdf page data through(?)
     ✓ fetching a not existing page should pass 404 through
