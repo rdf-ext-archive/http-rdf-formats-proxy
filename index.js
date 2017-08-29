@@ -5,19 +5,28 @@ const debugCall = require('debug')('call:http-rdf-formats-proxy')
 const rdfFetch = require('rdf-fetch-lite')
 const formats = require('rdf-formats-common')()
 const streamToString = require('stream-to-string')
+const accept = require('accept/lib/mediatype')
 
 class RdfFormatsProxy {
   constructor (req, res, next, options) {
-    debugCall('_constructor(req, res, next, options)')
-    debugCall(options)
+    debugCall('_constructor(req, res, next, options) // options = %o', options)
     this.req = req
     this.res = res
     this.next = next
     options = options || {}
+
     this.fetch = options.fetch || rdfFetch
     this.formats = options.formats ||
       (this.fetch.defaults && this.fetch.defaults.formats
         ? this.fetch.defaults.formats : formats)
+
+    this.fetchAccepts = this.formats.parsers.list()
+    this.fetchProduces = this.formats.serializers.list()
+    this.fetchOptions = {
+      method: this.req.method,
+      headers: {},
+      formats: this.formats
+    }
   }
 
   proxy () {
@@ -28,14 +37,16 @@ class RdfFormatsProxy {
     } else {
       Promise.resolve()
       .then(this._fetch.bind(this))
-      .then(this._processFetchResponse.bind(this))
+      .then(this._processResponse.bind(this))
       .then(this._processData.bind(this))
       .then(this._send.bind(this))
       .catch((err) => {
+        debug('something failed... %o', err)
         this._send(err, 502)
       })
     }
   }
+
 
   _processRequest () {
     debugCall('_processRequest()')
@@ -44,64 +55,68 @@ class RdfFormatsProxy {
       return '\'uri\' query parameter missing. ' +
         'Use ?uri=http://requested.example.com/file.rdf'
     }
-    // build fetch options
-    this.fetchOptions = {
-      method: this.req.method,
-      headers: { 'accept': this.req.headers['accept'] },
-      formats: this.formats
+    if (this.req.headers['content-type']) {
+      this.fetchOptions.headers['content-type'] = this.req.headers['content-type']
+      this.clientProduces = this.req.headers['content-type'].split(';').shift()
     }
-    // process Accept header
-    // TODO: do this properly (with correct priorities)
-    if (this.req.headers['accept']) {
-      this.accept = this.req.headers['accept']
-        .split(/,\s*/)
-        .map((type) => {
-          return type.split(';').shift()
-        })
-    } else {
-      this.fetchOptions.headers.accept = 'text/n3'
-      this.accept = [ this.fetchOptions.headers.accept ]
-    }
+    this.clientAccepts = accept.mediaTypes(this.req.headers['accept'])
+    this.fetchOptions.headers.accept = this._uniq(
+      this.fetchAccepts.concat(this.clientAccepts))
+
+    this.usableSerializers = this._intersect(this.clientAccepts, this.fetchProduces)
+    debug('-----------  Request negotiation  ------------')
+    debug('Headers: %o', this.req.headers)
+    debug('client produces: %o', this.clientProduces)
+    debug('client accepts: %o', this.clientAccepts)
+    debug('fetch accepts: %o', this.fetchAccepts)
+    debug('fetch produces: %o', this.fetchProduces)
+    debug('usable serializers: %o', this.usableSerializers)
+    debug('----------- /Request negotiation  ------------')
+
     return null // No Request error
   }
 
   _fetch () {
-    debugCall('_fetch() // ' + this.req.query.uri)
-//    debug(this.fetchOptions)
+    debugCall('_fetch()')
+    debug('fetching "%s" with options: %o', this.req.query.uri, this.fetchOptions)
     return this.fetch(this.req.query.uri, this.fetchOptions)
   }
 
-  _processFetchResponse (res) {
+  _processResponse (res) {
     debugCall('_processResponse(res)')
-    this.fetchResponse = res
     // get status and content type from the response
+    this.fetchResponse = res
+    debug('response: %o', res)
     this.status = res.status
+    debug('response status: %d', this.status)
     this.contentType = res.headers.get('content-type')
     if (this.contentType) {
-      this.contentType = this.contentType.split(';').shift()
+      this.serverProduces = this.contentType.split(';').shift()
     }
-    debug('Content-type: ' + this.contentType)
+    debug('server produces: %o', this.serverProduces)
+    // if the response status is not ok
+    if (res.status < 200 && res.status > 299) {
+      debug('Status is not ok (' + res.status + '). Passing data through...')
+      return this._passThrough()
+    }
+    if (this.clientAccepts.indexOf(this.serverProduces) !== -1) {
+      debug('Client accepts what server produces. Passing data through...')
+      return this._passThrough()
+    }
+    // what we do with that content-type?
+    if (this.fetchAccepts.indexOf(this.serverProduces) === -1) {
+      debug('Server\'s response cannot be accepted for parsing. Passing data through...')
+      return this._passThrough()
+    }
 
-    // if the response status is ok
-    if (res.status >= 200 && res.status < 300) {
-      // what we do with that content-type?
-      if (this.accept.indexOf(this.contentType) === -1) {
-        debug('Content-type not in accepted. Can we serialize?')
-        this._findSerializer()
-        if (this.serializer) {
-          debug('Serializer found, set content-type: ' + this.contentType)
-          return res.quadStream()
-        } else {
-          debug('No serializer found...')
-        }
-      } else {
-        debug('No translation required...')
-      }
-    } else {
-      debug('Status is not ok (' + res.status + ')...')
+    debug('Client does not accept. Can we serialize?')
+    if (this._findSerializer()) {
+      debug('Serializer found, changed content-type: ' + this.contentType + ' and Passing quadStream through...')
+      return res.quadStream()
     }
-    debug('Passing data through')
-    return streamToString(res.body)
+
+    debug('Passing data through...')
+    return this._passThrough()
   }
 
   _processData (quadStreamOrData) {
@@ -119,17 +134,15 @@ class RdfFormatsProxy {
     debugCall('_findSerializer()')
     if (this.contentType === null) {
       debug('no content-type... cannot convert from unknown format')
-      return
+      return false
     }
-    const serializersList = this.formats.serializers.list()
-    this.serializer = null
-    this.accept.some((acceptMime) => {
-      if (serializersList.indexOf(acceptMime) !== -1) {
-        if (this.serializer) { return true }
-        this.contentType = acceptMime
-        this.serializer = this.formats.serializers.find(acceptMime)
-      }
-    })
+    if (this.usableSerializers.length === 0) {
+      debug('no usable serializers... cannot convert')
+      return false
+    }
+    this.contentType = this.usableSerializers.shift()
+    this.serializer = this.formats.serializers.find(this.contentType)
+    return true
   }
 
   _send (data, status = null) {
@@ -141,6 +154,19 @@ class RdfFormatsProxy {
       this.res.set('content-type', this.contentType)
     }
     return this.res.status(status).send(data)
+  }
+
+  _passThrough () {
+    return streamToString(this.fetchResponse.body)
+  }
+
+  // util methods
+  _uniq(array) {
+    return [...new Set(array)]
+  }
+  _intersect(a, b) {
+    let t; if (b.length > a.length) t = b, b = a, a = t
+    return a.filter((e) => { return b.indexOf(e) > -1 })
   }
 }
 

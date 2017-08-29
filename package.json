@@ -26,6 +26,7 @@
     "standard": "^10.0.2"
   },
   "dependencies": {
+    "accept": "^2.1.4",
     "debug": "^3.0.0",
     "rdf-fetch-lite": "^1.0.0",
     "rdf-formats-common": "^1.0.0",

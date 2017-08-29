@@ -1,9 +1,12 @@
 /* global describe, it, before, after */
 'use strict'
 
-// const debug = require('debug')('test')
+const debug = require('debug')('test')
+debug('test')
+console.log('test')
 const expect = require('chai').expect
 const express = require('express')
+const nock = require('nock')
 const streamToString = require('stream-to-string')
 const rdfFetch = require('rdf-fetch')
 const formats = require('rdf-formats-common')()
@@ -12,13 +15,14 @@ const formatsProxy = require('..')
 const OldApiParserWrapper = formatsProxy.OldApiParserWrapper
 formats.parsers['application/rdf+xml'] = new OldApiParserWrapper({ parser: require('rdf-parser-rdfxml') })
 
+const nocksFile = './nock-rec.json'
+const nockActive = true
+const nockRecord = false
+
 const proxyUrlHost = 'http://localhost'
 const proxyPort = 8000
-
-const nockInit = require('./nock-init')
-nockInit(proxyUrlHost, proxyPort)
-
-const proxyUrl = proxyUrlHost + ':' + proxyPort + '/proxy'
+const proxyServer = proxyUrlHost+':'+proxyPort
+const proxyUrl = proxyServer + '/proxy'
 
 const app = express()
 app.get('/proxy', formatsProxy({ formats: formats }))
@@ -30,9 +34,26 @@ function proxyRequest (uri, accept) {
 describe('http-rdf-formats-proxy', () => {
   before(() => {
     app.server = app.listen(proxyPort)
+    if (nockRecord) {
+      nock.recorder.rec({
+        dont_print: true,
+        output_objects: true
+      })
+    } else {
+      if (nockActive) {
+        nock.load(nocksFile)
+      }
+    }
   })
   after(() => {
     app.server.close()
+    if (nockRecord) {
+      require('fs').writeFileSync(nocksFile, JSON.stringify(
+        nock.recorder.play().filter((nock) => {
+          return (nock.scope !== proxyServer)
+        })
+      ))
+    }
   })
   it('no uri specified -> 400 Bad Request', (done) => {
     rdfFetch(proxyUrl, { headers: { 'Accept': 'text/n3' } }).then((res) => {
@@ -58,7 +79,7 @@ describe('http-rdf-formats-proxy', () => {
       expect(res.status).to.be.equal(200)
       return res.dataset()
     }).then((data) => {
-      expect(data.length).to.be.equal(632)
+      expect(data.length).to.be.equal(620)
       done()
     }).catch(done)
   })
@@ -83,7 +104,7 @@ describe('http-rdf-formats-proxy', () => {
     }).catch(done)
   })
   it('fetching a not existing page should pass 404 through', (done) => {
-    proxyRequest('http://xmlns.com/foaf/spec/404page.ttl', 'text/n3').then((res) => {
+    proxyRequest('http://xmlns.com/404', 'text/n3').then((res) => {
       expect(res.status).to.be.equal(404)
       expect(res.headers.get('content-type')).to.be.equal('text/html; charset=utf-8')
       done()
