@@ -126,7 +126,7 @@ describe('http-rdf-formats-proxy', () => {
     }).catch(done)
   })
   it('fetching from a not existing server should yield 502(?)', (done) => {
-    proxyRequest('http://example.com/resource.ttl', 'text/n3').then((res) => {
+    proxyRequest('http://notexistingserver/resource.ttl', 'text/n3').then((res) => {
       expect(res.status).to.be.equal(502)
       expect(res.headers.get('content-type')).to.be.equal('application/json; charset=utf-8')
       return res.json()
