@@ -2,20 +2,20 @@
 'use strict'
 
 const debug = require('debug')('test')
-debug('test')
-console.log('test')
 const expect = require('chai').expect
+const http = require('http')
 const express = require('express')
 const nock = require('nock')
 const streamToString = require('stream-to-string')
 const rdfFetch = require('rdf-fetch')
 const formats = require('rdf-formats-common')()
+const bodyParser = require('rdf-body-parser')
 
 const formatsProxy = require('..')
 const OldApiParserWrapper = formatsProxy.OldApiParserWrapper
 formats.parsers['application/rdf+xml'] = new OldApiParserWrapper({ parser: require('rdf-parser-rdfxml') })
 
-const nocksFile = './nock-rec.json'
+const nocksFile = './test/nock-rec.json'
 const nockActive = true
 const nockRecord = false
 
@@ -24,15 +24,29 @@ const proxyPort = 8000
 const proxyServer = proxyUrlHost + ':' + proxyPort
 const proxyUrl = proxyServer + '/proxy'
 
+const serverPort = 8001
+const server = http.createServer((req, res) => {
+  debug(req.headers)
+  bodyParser.attach(req, res).then(() => {
+    debug('forward request')
+    res.writeHead(200, { 'Content-type': 'application/n-triples' })
+    res.end(req.graph.toString())
+  })
+})
 const app = express()
-app.get('/proxy', formatsProxy({ formats: formats }))
+app.use('/proxy', formatsProxy({ formats: formats }))
 
-function proxyRequest (uri, accept) {
-  return rdfFetch(proxyUrl + '?uri=' + uri, { headers: { 'Accept': accept } })
+function proxyRequest (uri, accept, options) {
+  options = options || {}
+  options.method = options.method || 'GET'
+  options.headers = options.headers || {}
+  options.headers['accept'] = accept
+  return rdfFetch(proxyUrl + '?uri=' + uri, options)
 }
 
 describe('http-rdf-formats-proxy', () => {
   before(() => {
+    server.listen(serverPort)
     app.server = app.listen(proxyPort)
     if (nockRecord) {
       nock.recorder.rec({
@@ -46,11 +60,12 @@ describe('http-rdf-formats-proxy', () => {
     }
   })
   after(() => {
+    server.close()
     app.server.close()
     if (nockRecord) {
       require('fs').writeFileSync(nocksFile, JSON.stringify(
         nock.recorder.play().filter((nock) => {
-          return (nock.scope !== proxyServer)
+          return (nock.scope !== proxyServer && nock.scope !== 'http://localhost:' + serverPort)
         })
       ))
     }
@@ -111,12 +126,43 @@ describe('http-rdf-formats-proxy', () => {
     }).catch(done)
   })
   it('fetching from a not existing server should yield 502(?)', (done) => {
-    proxyRequest('http://example.com/resource.ttl', 'text/n3').then((res) => {
+    proxyRequest('http://notexistingserver/resource.ttl', 'text/n3').then((res) => {
       expect(res.status).to.be.equal(502)
       expect(res.headers.get('content-type')).to.be.equal('application/json; charset=utf-8')
       return res.json()
     }).then((data) => {
       expect(data.name).to.equal('FetchError')
+      done()
+    }).catch(done)
+  })
+  it('forward convert json+ld to n3 and response convert n-triples to n3', (done) => {
+    const body = `{
+  "@context": "http://schema.org",
+  "@type": "Blog",
+  "name": "Blog name",
+  "url": "https://example.com",
+  "description": "Same as meta description",
+  "sameAs": [
+    "https://facebook.com/BlogPage",
+    "https://plus.google/BlogPage"
+  ],
+  "publisher": {
+    "@type": "Organization",
+    "name": "Blog Name"
+  }
+}
+`
+    proxyRequest('http://localhost:' + serverPort + '/&produce=text/n3', 'text/n3', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/ld+json'
+      },
+      body: body
+    }).then((res) => {
+      expect(res.status).to.be.equal(200)
+      return res.dataset()
+    }).then((data) => {
+      expect(data.length).to.be.equal(9)
       done()
     }).catch(done)
   })

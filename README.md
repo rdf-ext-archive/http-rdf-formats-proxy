@@ -37,6 +37,15 @@ curl -H 'Accept: application/ld+json' 'http://localhost:8000/proxy?uri=http://ex
 curl -H 'Accept: application/n-triples' 'http://localhost:8000/proxy?uri=http://example.com/resource.n3'
 ```
 
+Proxy works both directions. You can POST data, convert them through proxy and it POSTs  further.
+Response is then converted to Accepted format. To specify format for proxy request, use `produce` query parameter.
+```bash
+curl --data "<http://example.com/subject> <http://example.com/predicate> <http://example.com/object> ." \
+  -H 'Content-type: n-triples' \
+  -H 'Accept: text/n3' \
+  'http://localhost:8000/proxy?uri=http://example.com/consumer/&produce=application/ld+json'
+```
+
 ## tested cases
 ```mocha
     ✓ no uri specified -> 400 Bad Request
@@ -46,5 +55,6 @@ curl -H 'Accept: application/n-triples' 'http://localhost:8000/proxy?uri=http://
     ✓ pass non-rdf page data through(?)
     ✓ fetching a not existing page should pass 404 through
     ✓ fetching from a not existing server should yield 502(?)
+    ✓ forward convert json+ld to n3 and response convert n-triples to n3
 ```
 

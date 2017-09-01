@@ -6,6 +6,7 @@ const rdfFetch = require('rdf-fetch-lite')
 const formats = require('rdf-formats-common')()
 const streamToString = require('stream-to-string')
 const accept = require('accept/lib/mediatype')
+const bodyParser = require('rdf-body-parser')
 
 class RdfFormatsProxy {
   constructor (req, res, next, options) {
@@ -31,20 +32,23 @@ class RdfFormatsProxy {
 
   proxy () {
     debugCall('proxy()')
-    const badRequest = this._processRequest()
-    if (badRequest) {
-      this._send(badRequest, 400)
-    } else {
-      Promise.resolve()
-      .then(this._fetch.bind(this))
-      .then(this._processResponse.bind(this))
-      .then(this._processData.bind(this))
-      .then(this._send.bind(this))
-      .catch((err) => {
-        debug('something failed... %o', err)
-        this._send(err, 502)
-      })
-    }
+    bodyParser.attach(this.req, this.res, { formats: this.formats })
+    .then(() => {
+      const badRequest = this._processRequest()
+      if (badRequest) {
+        this._send(badRequest, 400)
+      } else {
+        Promise.resolve()
+        .then(this._fetch.bind(this))
+        .then(this._processResponse.bind(this))
+        .then(this._processData.bind(this))
+        .then(this._send.bind(this))
+        .catch((err) => {
+          debug('something failed... %o', err)
+          this._send(err, 502)
+        })
+      }
+    })
   }
 
   _processRequest () {
@@ -54,6 +58,11 @@ class RdfFormatsProxy {
       return '\'uri\' query parameter missing. ' +
         'Use ?uri=http://requested.example.com/file.rdf'
     }
+    debug('-----------  Request information and negotiation  ------------')
+    debug('Query params: %o', this.req.query)
+    debug('Method: %o', this.req.method)
+    debug('Headers: %o', this.req.headers)
+
     if (this.req.headers['content-type']) {
       this.fetchOptions.headers['content-type'] = this.req.headers['content-type']
       this.clientProduces = this.req.headers['content-type'].split(';').shift()
@@ -63,14 +72,23 @@ class RdfFormatsProxy {
       this.fetchAccepts.concat(this.clientAccepts))
 
     this.usableSerializers = this._intersect(this.clientAccepts, this.fetchProduces)
-    debug('-----------  Request negotiation  ------------')
-    debug('Headers: %o', this.req.headers)
+
+    if (this.req.graph) {
+      debug('graph length: %o', this.req.graph.length)
+      this.fetchOptions.body = this.req.graph.toStream()
+      if (this.req.query.produce) {
+        this.fetchOptions.headers['content-type'] = this.req.query.produce
+      }
+    } else {
+      debug('no graph in payload')
+    }
+
     debug('client produces: %o', this.clientProduces)
     debug('client accepts: %o', this.clientAccepts)
     debug('fetch accepts: %o', this.fetchAccepts)
     debug('fetch produces: %o', this.fetchProduces)
     debug('usable serializers: %o', this.usableSerializers)
-    debug('----------- /Request negotiation  ------------')
+    debug('----------- /Request information and negotiation  ------------')
 
     return null // No Request error
   }

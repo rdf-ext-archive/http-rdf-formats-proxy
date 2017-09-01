@@ -28,6 +28,7 @@
   "dependencies": {
     "accept": "^2.1.4",
     "debug": "^3.0.0",
+    "rdf-body-parser": "^1.1.1",
     "rdf-fetch-lite": "^1.0.0",
     "rdf-formats-common": "^1.0.0",
     "stream-to-string": "^1.1.0"
