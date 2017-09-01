@@ -1,6 +1,6 @@
 {
   "name": "http-rdf-formats-proxy",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Express middleware for fetching and converting resources between RDF formats",
   "main": "index.js",
   "scripts": {
@@ -8,14 +8,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/tomasklapka/http-rdf-formats-proxy.git"
+    "url": "https://github.com/rdf-ext/http-rdf-formats-proxy.git"
   },
   "author": "Tomáš Klapka <tomas@klapka.cz>",
   "license": "UNLICENSED",
   "bugs": {
-    "url": "https://github.com/tomasklapka/http-rdf-formats-proxy/issues"
+    "url": "https://github.com/rdf-ext/http-rdf-formats-proxy/issues"
   },
-  "homepage": "https://github.com/tomasklapka/http-rdf-formats-proxy",
+  "homepage": "https://github.com/rdf-ext/http-rdf-formats-proxy",
   "devDependencies": {
     "chai": "^4.1.1",
     "express": "^4.15.4",
