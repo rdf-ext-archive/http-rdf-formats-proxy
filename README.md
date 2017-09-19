@@ -46,6 +46,14 @@ curl --data "<http://example.com/subject> <http://example.com/predicate> <http:/
   'http://localhost:8000/proxy?uri=http://example.com/consumer/&produce=application/ld+json'
 ```
 
+Proxy can act as a converter. To use converter mode don't use any query parameter and just POST your data. Proxy will return the data converted according to the request's Accept header.
+```bash
+curl --data "<http://example.com/subject> <http://example.com/predicate> <http://example.com/object> ." \
+  -H 'Content-type: n-triples' \
+  -H 'Accept: application/ld+json' \
+  'http://localhost:8000/proxy'
+```
+
 ## tested cases
 ```mocha
     ✓ no uri specified -> 400 Bad Request
@@ -56,5 +64,6 @@ curl --data "<http://example.com/subject> <http://example.com/predicate> <http:/
     ✓ fetching a not existing page should pass 404 through
     ✓ fetching from a not existing server should yield 502(?)
     ✓ forward convert json+ld to n3 and response convert n-triples to n3
+    ✓ convert mode - json+ld to n-triples
 ```
 

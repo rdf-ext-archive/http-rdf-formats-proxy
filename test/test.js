@@ -41,6 +41,9 @@ function proxyRequest (uri, accept, options) {
   options.method = options.method || 'GET'
   options.headers = options.headers || {}
   options.headers['accept'] = accept
+  if (!uri) {
+    return rdfFetch(proxyUrl, options)
+  }
   return rdfFetch(proxyUrl + '?uri=' + uri, options)
 }
 
@@ -153,6 +156,38 @@ describe('http-rdf-formats-proxy', () => {
 }
 `
     proxyRequest('http://localhost:' + serverPort + '/&produce=text/n3', 'text/n3', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/ld+json'
+      },
+      body: body
+    }).then((res) => {
+      expect(res.status).to.be.equal(200)
+      return res.dataset()
+    }).then((data) => {
+      expect(data.length).to.be.equal(9)
+      done()
+    }).catch(done)
+  })
+
+  it('convert mode - json+ld to n-triples', (done) => {
+    const body = `{
+  "@context": "http://schema.org",
+  "@type": "Blog",
+  "name": "Blog name",
+  "url": "https://example.com",
+  "description": "Same as meta description",
+  "sameAs": [
+    "https://facebook.com/BlogPage",
+    "https://plus.google/BlogPage"
+  ],
+  "publisher": {
+    "@type": "Organization",
+    "name": "Blog Name"
+  }
+}
+`
+    proxyRequest(null, 'application/n-triples', {
       method: 'POST',
       headers: {
         'content-type': 'application/ld+json'
